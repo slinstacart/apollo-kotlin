@@ -10,6 +10,7 @@ import com.apollographql.apollo3.api.http.HttpHeader
 import com.apollographql.apollo3.api.http.HttpMethod
 import com.apollographql.apollo3.interceptor.ApolloInterceptor
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.single
 
 class ApolloCall<D : Operation.Data> internal constructor(

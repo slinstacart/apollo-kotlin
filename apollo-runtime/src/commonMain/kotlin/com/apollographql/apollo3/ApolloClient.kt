@@ -39,6 +39,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import okio.Closeable
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
@@ -169,7 +170,9 @@ private constructor(
         }
         .build()
 
-    return DefaultInterceptorChain(interceptors + networkInterceptor, 0).proceed(request)
+    return DefaultInterceptorChain(interceptors + networkInterceptor, 0)
+        .proceed(request)
+        .flowOn(request.executionContext[ConcurrencyInfo]!!.dispatcher)
   }
 
   /**

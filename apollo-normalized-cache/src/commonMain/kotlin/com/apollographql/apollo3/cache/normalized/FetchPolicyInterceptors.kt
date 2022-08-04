@@ -2,6 +2,7 @@
 
 package com.apollographql.apollo3.cache.normalized
 
+import com.apollographql.apollo3.ConcurrencyInfo
 import com.apollographql.apollo3.api.ApolloRequest
 import com.apollographql.apollo3.api.ApolloResponse
 import com.apollographql.apollo3.api.Operation
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.singleOrNull
 import kotlin.jvm.JvmName
@@ -216,10 +218,11 @@ val CacheAndNetworkInterceptor = object : ApolloInterceptor {
 
 internal val FetchPolicyRouterInterceptor = object : ApolloInterceptor {
   override fun <D : Operation.Data> intercept(request: ApolloRequest<D>, chain: ApolloInterceptorChain): Flow<ApolloResponse<D>> {
-    if (request.operation !is Query) {
+    return if (request.operation !is Query) {
       // Subscriptions and Mutations do not support fetchPolicies
-      return chain.proceed(request)
+      chain.proceed(request)
+    } else {
+      request.fetchPolicyInterceptor.intercept(request, chain)
     }
-    return request.fetchPolicyInterceptor.intercept(request, chain)
   }
 }

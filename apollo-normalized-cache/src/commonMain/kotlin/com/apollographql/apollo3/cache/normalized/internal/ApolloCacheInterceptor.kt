@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -102,7 +101,7 @@ internal class ApolloCacheInterceptor(
         interceptQuery(request as ApolloRequest<Query.Data>, chain) as Flow<ApolloResponse<D>>
       }
       else -> error("Unknown operation ${request.operation}")
-    }.flowOn(request.executionContext[ConcurrencyInfo]!!.dispatcher)
+    }
   }
 
   /**
