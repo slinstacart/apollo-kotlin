@@ -1,0 +1,28 @@
+type AnewDieWasCreated {
+  id: ID!
+
+  die: Die
+}
+
+type Die {
+  id: ID!
+
+  sides: Int!
+
+  color: String!
+
+  roll: Int!
+}
+
+type Query {
+  dice: [Die!]!
+}
+
+type Subscription {
+  aNewDieWasCreated: AnewDieWasCreated!
+}
+
+schema {
+  query: Query
+  subscription: Subscription
+}

@@ -1,5 +1,6 @@
 package com.apollographql.apollo3.network.http
 
+import com.apollographql.apollo3.annotations.ApolloExperimental
 import com.apollographql.apollo3.api.ApolloRequest
 import com.apollographql.apollo3.api.ApolloResponse
 import com.apollographql.apollo3.api.CustomScalarAdapters
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class HttpNetworkTransport
@@ -33,6 +35,7 @@ private constructor(
     val engine: HttpEngine,
     val interceptors: List<HttpInterceptor>,
     val exposeErrorBody: Boolean,
+    val subscriptionsPoc: Boolean,
 ) : NetworkTransport {
   private val engineInterceptor = EngineInterceptor()
 
@@ -74,17 +77,21 @@ private constructor(
 
       // When using @defer, the response contains multiple parts, using the multipart content type.
       // See https://github.com/graphql/graphql-over-http/blob/main/rfcs/IncrementalDelivery.md
-      if (httpResponse.isMultipart) {
-        emitAll(
+      emitAll(when {
+        httpResponse.isMultipart -> {
+          if (subscriptionsPoc) {
+            multipleSubscriptionResponses(request.operation, customScalarAdapters, httpResponse)
+          } else {
             multipleResponses(request.operation, customScalarAdapters, httpResponse)
-                .map { it.withHttpInfo(request.requestUuid, httpResponse, millisStart) }
-        )
-      } else {
-        emit(
-            singleResponse(request.operation, customScalarAdapters, httpResponse)
-                .withHttpInfo(request.requestUuid, httpResponse, millisStart)
-        )
-      }
+          }
+        }
+
+        else -> {
+          singleResponse(request.operation, customScalarAdapters, httpResponse)
+        }
+      }.map {
+        it.withHttpInfo(request.requestUuid, httpResponse, millisStart)
+      })
     }
   }
 
@@ -92,7 +99,7 @@ private constructor(
       operation: Operation<D>,
       customScalarAdapters: CustomScalarAdapters,
       httpResponse: HttpResponse,
-  ): ApolloResponse<D> {
+  ): Flow<ApolloResponse<D>> {
     val response = try {
       operation.parseJsonResponse(
           jsonReader = httpResponse.body!!.jsonReader(),
@@ -102,7 +109,7 @@ private constructor(
       throw wrapThrowableIfNeeded(e)
     }
 
-    return response.newBuilder().isLast(true).build()
+    return flowOf(response.newBuilder().isLast(true).build())
   }
 
   private fun <D : Operation.Data> multipleResponses(
@@ -126,6 +133,25 @@ private constructor(
           }
         }
         .filterNot { jsonMerger.isEmptyPayload }
+  }
+
+
+  private fun <D : Operation.Data> multipleSubscriptionResponses(
+      operation: Operation<D>,
+      customScalarAdapters: CustomScalarAdapters,
+      httpResponse: HttpResponse,
+  ): Flow<ApolloResponse<D>> {
+    return multipartBodyFlow(httpResponse)
+        .map { part ->
+          try {
+            operation.parseJsonResponse(
+                jsonReader = part.jsonReader(),
+                customScalarAdapters = customScalarAdapters
+            ).newBuilder().isLast(false).build()
+          } catch (e: Exception) {
+            throw wrapThrowableIfNeeded(e)
+          }
+        }
   }
 
   private fun <D : Operation.Data> ApolloResponse<D>.withHttpInfo(
@@ -178,6 +204,7 @@ private constructor(
     private var engine: HttpEngine? = null
     private val interceptors: MutableList<HttpInterceptor> = mutableListOf()
     private var exposeErrorBody: Boolean = false
+    private var subscriptionsPoc: Boolean = false
 
     fun httpRequestComposer(httpRequestComposer: HttpRequestComposer) = apply {
       this.httpRequestComposer = httpRequestComposer
@@ -185,6 +212,11 @@ private constructor(
 
     fun serverUrl(serverUrl: String) = apply {
       this.serverUrl = serverUrl
+    }
+
+    @ApolloExperimental
+    fun subscriptionsPoc(subscriptionsPoc: Boolean) = apply {
+      this.subscriptionsPoc = subscriptionsPoc
     }
 
     /**
@@ -228,6 +260,7 @@ private constructor(
           engine = engine ?: DefaultHttpEngine(),
           interceptors = interceptors,
           exposeErrorBody = exposeErrorBody,
+          subscriptionsPoc = subscriptionsPoc,
       )
     }
   }
