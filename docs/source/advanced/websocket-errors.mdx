@@ -11,6 +11,12 @@ When your network goes down or your server closes the connection (because it wan
 ```kotlin
 apolloClient.subscription(MySubscription())
     .toFlow()
+    .onEach {
+      // Surface the network error
+      if (it.exception != null) {
+        throw it.exception
+      }
+    }
     .retryWhen { e, attempt ->
       delay(2.0.pow(attempt.toDouble()).toLong())
       // retry after the delay
@@ -53,11 +59,17 @@ In some cases, you may have a situation where an error is for a single consumer.
 }
 ```
 
-In these cases, the Flow will throw a `SubscriptionOperationException` error and you will need to handle the retry:
+In these cases, the Flow will emit an `ApolloResponse` with a `SubscriptionOperationException` in its `exception` and you will need to handle the retry:
 
 ```kotlin
 apolloClient.subscription(MySubscription())
     .toFlow()
+    .onEach {
+      // Surface the network error
+      if (it.exception != null) {
+        throw it.exception
+      }
+    }
     .retryWhen { e, attempt ->
       if (e is SubscriptionOperationException) {
         // handle the operation error
