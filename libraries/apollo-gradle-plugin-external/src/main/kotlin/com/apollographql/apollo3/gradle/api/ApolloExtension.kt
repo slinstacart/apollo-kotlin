@@ -9,12 +9,20 @@ import org.gradle.api.provider.Property
 interface ApolloExtension : Service {
 
   /**
-   * registers a new service
+   * Registers a new [Service]
    *
-   * @param name: the name of the service, this is an arbitrary name only used to create the tasks. It must be unique
-   * @param action: the configure action for the [Service]
+   * @param name the name of the service, this is an arbitrary name only used to create the tasks. It must be unique
+   * @param action the configure action for the [Service]
    */
   fun service(name: String, action: Action<Service>)
+
+  /**
+   * Finds a [Service]
+   *
+   * @param name the name of the service as passed in a previous service() call
+   * @return the service with the given name or `null` if no service is found
+   */
+  fun findService(name: String): Service?
 
   /**
    * registers multiple services for an android project
